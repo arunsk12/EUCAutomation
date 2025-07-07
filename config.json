@@ -1,0 +1,53 @@
+[
+  {
+    "step_id": 1,
+    "stage": "Data Ingestion",
+    "description": "Load Input Data 1",
+    "source_table": "Input_Data_1",
+    "output_alias": "stage1",
+    "sql": "SELECT * FROM `{{project}}.{{dataset}}.Input_Data_1`"
+  },
+{
+  "step_id": 2,
+  "stage": "Join Metadata",
+  "description": "Enrich with product attributes",
+  "sql": "SELECT a.*, b.Category, b.Product_Name, b.Price FROM `eucautomation.your_dataset.stage1` a LEFT JOIN `eucautomation.your_dataset.Input_Data_2` b ON a.Product_ID = b.Product_ID",
+  "rules": [
+    {
+      "rule_id": "R2_01",
+      "description": "Missing Category after join",
+      "comment": "Check if any Product_IDs failed to enrich with Category",
+      "statement": "SELECT TO_JSON_STRING(t) FROM `eucautomation.your_dataset.stage2` t WHERE Category IS NULL"
+    },
+    {
+      "rule_id": "R2_02",
+      "description": "Price is zero or negative",
+      "comment": "Price must be a positive value",
+      "statement": "SELECT TO_JSON_STRING(t) FROM `eucautomation.your_dataset.stage2` t WHERE Price <= 0"
+    }
+  ]
+},
+  {
+    "step_id": 3,
+    "stage": "Calculation Logic",
+    "description": "Calculate Total Cost",
+    "output_alias": "stage3",
+    "sql": "SELECT *, Quantity * Price AS Total_Cost FROM `{{project}}.{{dataset}}.stage2`"
+  },
+  {
+    "step_id": 4,
+    "stage": "Join Reference",
+    "description": "Map Region and Department",
+    "source_table": "Ref_Data",
+    "join_key": "Category",
+    "output_alias": "stage4",
+    "sql": "SELECT a.*, b.Region, b.Department FROM `{{project}}.{{dataset}}.stage3` a LEFT JOIN `{{project}}.{{dataset}}.Ref_Data` b ON a.Category = b.Category"
+  },
+  {
+    "step_id": 5,
+    "stage": "Aggregation",
+    "description": "Summarize by Region, Department, Product",
+    "output_table": "Final_Output",
+    "sql": "SELECT Region, Department, Product_Name, SUM(Total_Cost) AS Total_Cost FROM `{{project}}.{{dataset}}.stage4` GROUP BY Region, Department, Product_Name"
+  }
+]

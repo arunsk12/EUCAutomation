@@ -24,10 +24,19 @@ CREATE TABLE `eucautomation.aks_dataset.Ref_Data` (
 );
 
 CREATE TABLE `eucautomation.aks_dataset.config_table` (
+  control_id STRING,
+  control_type STRING,
+  batch_layer STRING,
+  region STRING,
+  run_group STRING,
+  exec_type STRING,
+  place_holder_1 STRING,
+  place_holder_2 STRING,
   step_id INT64 NOT NULL,
-  stage STRING,
+  rule_id STRING,
   description STRING,
-  sql STRING
+  comment STRING,
+  statement STRING
 );
 
 
@@ -41,6 +50,14 @@ CREATE TABLE `eucautomation.aks_dataset.config_rules` (
 
 CREATE TABLE `eucautomation.aks_dataset.exception_report` (
   execution_id STRING,
+  control_id STRING,
+  control_type STRING,
+  batch_layer STRING,
+  region STRING,
+  run_group STRING,
+  exec_type STRING,
+  place_holder_1 STRING,
+  place_holder_2 STRING,
   step_id INT64,
   rule_id STRING,
   rule_description STRING,
@@ -93,57 +110,48 @@ VALUES
   ('CAT4', 'West', 'Admin');
   
   
-  TRUNCATE TABLE `eucautomation.aks_dataset.config_table`;  
-  INSERT INTO `eucautomation.aks_dataset.config_table` (step_id, stage, description, sql)
+TRUNCATE TABLE `eucautomation.aks_dataset.config_table`;  
+  
+  
+INSERT INTO `eucautomation.aks_dataset.config_table`
+(control_id, control_type, batch_layer, region, run_group, exec_type, place_holder_1, place_holder_2, step_id, rule_id, description, comment, statement)
 VALUES
-  (1, 'Data Ingestion', 'Load Input Data 1', 'insert into eucautomation.aks_dataset.stage1 (SELECT * FROM `eucautomation.aks_dataset.Input_Data_1`)'),
-  (2, 'Join Metadata', 'Enrich with product attributes', 
-   'insert into eucautomation.aks_dataset.stage2 (SELECT a.*, b.Category, b.Product_Name, b.Price FROM `eucautomation.aks_dataset.stage1` a LEFT JOIN `eucautomation.aks_dataset.Input_Data_2` b ON a.Product_ID = b.Product_ID)'),
-  (3, 'Calculation Logic', 'Calculate Total Cost', 
-   'insert into eucautomation.aks_dataset.stage3 (SELECT *, Quantity * Price AS Total_Cost FROM `eucautomation.aks_dataset.stage2`)'),
-  (4, 'Join Reference', 'Map Region and Department', 
-   'insert into eucautomation.aks_dataset.stage4 (SELECT a.*, b.Region, b.Department FROM `eucautomation.aks_dataset.stage3` a LEFT JOIN `eucautomation.aks_dataset.Ref_Data` b ON a.Category = b.Category)'),
-  (5, 'Aggregation', 'Summarize by Region, Department, Product', 
-   'insert into eucautomation.aks_dataset.Final_Output (SELECT Region, Department, Product_Name, SUM(Total_Cost) AS Total_Cost FROM `eucautomation.aks_dataset.stage4` GROUP BY Region, Department, Product_Name)');
+-- Step 1: Data Ingestion
+('ctrl_fmrt_1', 'FMRT', 'RWA', 'UK-CFC', 'HBGB', 'SQL', '', '', 1, 'STEP_01', 'Load Input Data 1', 'Raw data ingestion from source', 'insert into eucautomation.aks_dataset.stage1 (SELECT * FROM `eucautomation.aks_dataset.Input_Data_1`)'),
+
+-- Step 2: Join Metadata
+('ctrl_fmrt_1', 'FMRT', 'RWA', 'UK-CFC', 'HBGB', 'SQL', '', '', 2, 'STEP_02', 'Enrich with product attributes', 'Join product metadata to transactional data', 'insert into eucautomation.aks_dataset.stage2 (SELECT a.*, b.Category, b.Product_Name, b.Price FROM `eucautomation.aks_dataset.stage1` a LEFT JOIN `eucautomation.aks_dataset.Input_Data_2` b ON a.Product_ID = b.Product_ID)'),
+
+-- Step 3: Calculation Logic
+('ctrl_fmrt_1', 'FMRT', 'RWA', 'UK-CFC', 'HBGB', 'SQL', '', '', 3, 'STEP_03', 'Calculate Total Cost', 'Derive cost metrics using Quantity * Price', 'insert into eucautomation.aks_dataset.stage3 (SELECT *, Quantity * Price AS Total_Cost FROM `eucautomation.aks_dataset.stage2`)'),
+
+-- Step 4: Join Reference
+('ctrl_fmrt_1', 'FMRT', 'RWA', 'UK-CFC', 'HBGB', 'SQL', '', '', 4, 'STEP_04', 'Map Region and Department', 'Enrich records with category-region mappings', 'insert into eucautomation.aks_dataset.stage4 (SELECT a.*, b.Region, b.Department FROM `eucautomation.aks_dataset.stage3` a LEFT JOIN `eucautomation.aks_dataset.Ref_Data` b ON a.Category = b.Category)'),
+
+-- Step 5: Aggregation
+('ctrl_fmrt_1', 'FMRT', 'RWA', 'UK-CFC', 'HBGB', 'SQL', '', '', 5, 'STEP_05', 'Summarize by Region, Department, Product', 'Group and aggregate total cost by product slice', 'insert into eucautomation.aks_dataset.Final_Output (SELECT Region, Department, Product_Name, SUM(Total_Cost) AS Total_Cost FROM `eucautomation.aks_dataset.stage4` GROUP BY Region, Department, Product_Name)');
+
+
 
 -- MANUAL STEPS
 -- Step 1: Load Input Data
-CREATE OR REPLACE TABLE `eucautomation.aks_dataset.stage1` AS
-SELECT * FROM `eucautomation.aks_dataset.Input_Data_1`;
+CREATE OR REPLACE TABLE `eucautomation.aks_dataset.stage1` AS SELECT * FROM `eucautomation.aks_dataset.Input_Data_1`;
 
 -- Step 2: Enrich with Product Info
-CREATE OR REPLACE TABLE `eucautomation.aks_dataset.stage2` AS
-SELECT a.*, b.Category, b.Product_Name, b.Price
-FROM `eucautomation.aks_dataset.stage1` a
-LEFT JOIN `eucautomation.aks_dataset.Input_Data_2` b
-ON a.Product_ID = b.Product_ID;
+CREATE OR REPLACE TABLE `eucautomation.aks_dataset.stage2` AS SELECT a.*, b.Category, b.Product_Name, b.Price FROM `eucautomation.aks_dataset.stage1` a LEFT JOIN `eucautomation.aks_dataset.Input_Data_2` b ON a.Product_ID = b.Product_ID;
 
 -- Step 3: Calculate Total Cost
-CREATE OR REPLACE TABLE `eucautomation.aks_dataset.stage3` AS
-SELECT *, Quantity * Price AS Total_Cost
-FROM `eucautomation.aks_dataset.stage2`;
+CREATE OR REPLACE TABLE `eucautomation.aks_dataset.stage3` AS SELECT *, Quantity * Price AS Total_Cost FROM `eucautomation.aks_dataset.stage2`;
 
 -- Step 4: Join Reference Info
-CREATE OR REPLACE TABLE `eucautomation.aks_dataset.stage4` AS
-SELECT a.*, b.Region, b.Department
-FROM `eucautomation.aks_dataset.stage3` a
-LEFT JOIN `eucautomation.aks_dataset.Ref_Data` b
-ON a.Category = b.Category;
+CREATE OR REPLACE TABLE `eucautomation.aks_dataset.stage4` AS SELECT a.*, b.Region, b.Department FROM `eucautomation.aks_dataset.stage3` a LEFT JOIN `eucautomation.aks_dataset.Ref_Data` b ON a.Category = b.Category;
 
 -- Step 5: Aggregate Summary
-CREATE OR REPLACE TABLE `eucautomation.aks_dataset.Final_Output` AS
-SELECT Region, Department, Product_Name, SUM(Total_Cost) AS Total_Cost
-FROM `eucautomation.aks_dataset.stage4`
-GROUP BY Region, Department, Product_Name;
+CREATE OR REPLACE TABLE `eucautomation.aks_dataset.Final_Output` AS SELECT Region, Department, Product_Name, SUM(Total_Cost) AS Total_Cost FROM `eucautomation.aks_dataset.stage4` GROUP BY Region, Department, Product_Name;
 
-------------------------------------------------
-TRUNCATE TABLE `eucautomation.aks_dataset.config_table`;  
-
-TRUNCATE TABLE `eucautomation.aks_dataset.Input_Data_1`; 
-
-TRUNCATE TABLE `eucautomation.aks_dataset.Input_Data_2`; 
-
-------------------------------------------------
+-- TRUNCATE TABLE `eucautomation.aks_dataset.config_table`;  
+-- TRUNCATE TABLE `eucautomation.aks_dataset.Input_Data_1`; 
+-- TRUNCATE TABLE `eucautomation.aks_dataset.Input_Data_2`; 
 
 TRUNCATE TABLE `eucautomation.aks_dataset.stage1`;
 
@@ -153,7 +161,8 @@ TRUNCATE TABLE `eucautomation.aks_dataset.stage3`;
 
 TRUNCATE TABLE `eucautomation.aks_dataset.stage4`;
 
-------------------------------------------------
+TRUNCATE TABLE `eucautomation.aks_dataset.Final_Output`; 
+
 TRUNCATE TABLE `eucautomation.aks_dataset.pipeline_step_logs`; 
 
 TRUNCATE TABLE `eucautomation.aks_dataset.exception_report`; 
@@ -161,17 +170,6 @@ TRUNCATE TABLE `eucautomation.aks_dataset.exception_report`;
 
 
 
-------------------------------------------------
-
-
-
-SELECT
-  execution_id,
-  step_id,
-  rule_id,
-  rule_description,
-  COUNT(*) AS failed_rows
-FROM `eucautomation.aks_dataset.exception_report`
-GROUP BY execution_id, step_id, rule_id, rule_description
+-- SELECT execution_id, step_id, rule_id, rule_description, COUNT(*) AS failed_rows FROM `eucautomation.aks_dataset.exception_report` GROUP BY execution_id, step_id, rule_id, rule_description
 
 

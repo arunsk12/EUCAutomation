@@ -6,9 +6,9 @@ I’m planning to initiate a proof of concept that addresses the manual overhead
 
 This solution is a fully orchestrated data pipeline in BigQuery that replaces those manual processes with config-driven SQL transformations, rule-based validations, and structured anomaly reporting. It mimics the step-by-step logic users perform in Excel, but automates it end-to-end with full traceability.
 
-Once we've worked through this initial POC and decode the transformation logic that "FMRT UK CFC" team apply, the same framework can be extended across other regions and workflows (bifurcation) as well. 
+Once we've worked through this initial POC and decode the transformation logic that other teams apply, the same framework can be extended across other regions and workflows as well. 
 
-The idea is to build a reusable orchestration template that adapts to diverse EUC logic while maintaining governance, speed, and consistency. 
+The idea is to build a reusable orchestration template that adapts to diverse spreadsheet logic while maintaining governance, speed, and consistency. 
 
 I will walk through and show a quick demo once I have a simple workflow configured and running in BigQuery. 
 

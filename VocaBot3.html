@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Vocabulary VocaBot - Word of the Day</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue/grey background */
+        }
+        .card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease-in-out;
+        }
+        .card:hover {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transform: translateY(-2px);
+        }
+        /* Custom spinner style */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* --- STREAK CELEBRATION ANIMATION --- */
+        .streak-celebration {
+            animation: pulse-grow 0.5s ease-out;
+            color: #92400e !important; /* Force text color during animation */
+        }
+        
+        @keyframes pulse-grow {
+            0% { 
+                transform: scale(1); 
+                background-color: transparent; /* No background start */
+            }
+            50% { 
+                transform: scale(1.3); /* Grow larger */
+                background-color: rgba(255, 255, 255, 0.9); /* Bright flash */
+                color: #f59e0b !important; /* Yellow-500 flash text */
+            }
+            100% { 
+                transform: scale(1); 
+                background-color: transparent; /* Return to no background */
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 flex items-center justify-center">
+
+    <div id="app" class="w-full max-w-md text-gray-800">
+
+        <!-- Login Screen -->
+        <div id="login-screen" class="bg-white p-8 rounded-3xl card">
+            <h1 class="text-4xl font-black text-indigo-700 text-center mb-6">
+                🚀 VocaBot !
+            </h1>
+            <p class="text-center text-sm text-gray-600 mb-6">
+                Please log in with your character name.
+            </p>
+            <div class="space-y-4">
+                <input type="text" id="username-input" placeholder="Enter Username " 
+                       class="w-full p-3 border border-indigo-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500">
+                <input type="password" id="password-input" placeholder="Enter Password" 
+                       class="w-full p-3 border border-indigo-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500">
+                <p id="login-status" class="text-sm text-red-500 text-center"></p>
+                <button onclick="handleLogin()" id="login-button" 
+                        class="w-full py-3 text-lg font-bold bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition duration-150 active:bg-indigo-700 disabled:opacity-50">
+                    Lift Off!
+                </button>
+            </div>
+            <p class="text-xs text-center text-gray-400 mt-4">
+                Available Users: anime avatars
+            </p>
+        </div>
+
+        <!-- Main Application Screen (Hidden by default) -->
+        <div id="main-app" class="hidden bg-white p-6 rounded-3xl card">
+            
+            <div class="flex justify-between items-start mb-6">
+                <h1 class="text-4xl font-black text-indigo-700">VocaBot</h1>
+                <div class="text-right">
+                    <p id="user-id-display" class="text-base font-bold text-indigo-600 break-words">User: Loading...</p>
+                    <button onclick="handleLogout()" class="text-xs text-red-500 hover:text-red-700">
+                        (Logout)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Streak Display -->
+            <div class="mb-4 p-3 bg-red-500 rounded-xl flex items-center justify-center">
+                <span class="text-white text-lg font-bold mr-2">🔥 Daily Streak:</span>
+                <!-- Added inline-block for transform animation to work -->
+                <span id="streak-counter" class="text-white text-3xl font-extrabold p-1 rounded-md transition-all duration-300 inline-block">0</span>
+            </div>
+
+
+            <div id="word-display" class="space-y-4">
+                <!-- Word and Definition Area -->
+                <div class="bg-indigo-50 p-4 rounded-xl border-2 border-indigo-200">
+                    <h2 class="text-2xl font-bold text-indigo-600 mb-1">Word: <span id="current-word" class="font-extrabold text-indigo-900">Word</span></h2>
+                    <p class="text-sm font-semibold text-gray-500 mb-2" id="part-of-speech">Part of Speech</p>
+                    <p class="text-lg" id="current-definition">A simple and clear definition.</p>
+                </div>
+
+                <!-- Gemini-Generated Example (The Agentic Value) -->
+                <div class="bg-yellow-50 p-4 rounded-xl border-2 border-yellow-300">
+                    <h3 class="text-xl font-bold text-yellow-700 mb-2 flex items-center">
+                        ✨ Fun Example from VocaBot
+                    </h3>
+                    <p class="text-lg italic text-gray-700" id="gemini-example">
+                        The brain-helper will create a super fun sentence here!
+                    </p>
+                </div>
+                
+                <div id="save-status" class="text-center text-sm font-medium h-5"></div>
+                
+            </div>
+
+            <!-- Action Button -->
+            <div class="mt-8">
+                <button id="fetch-button" 
+                        class="w-full py-4 text-xl font-extrabold bg-green-500 text-white rounded-xl hover:bg-green-600 transition duration-150 active:bg-green-700 disabled:opacity-50 flex items-center justify-center"
+                        onclick="fetchWordAndGenerateExample()">
+                    <span id="button-text">Get Today's New Word!</span>
+                    <div id="button-loader" class="loader ml-3 hidden"></div>
+                </button>
+            </div>
+
+            <!-- Word History and Quiz Links -->
+            <div class="mt-4 text-center grid grid-cols-2 gap-3">
+                <button onclick="showHistory()" class="py-2 bg-indigo-100 rounded-lg text-indigo-600 hover:bg-indigo-200 font-medium text-sm">
+                    📜 Word History
+                </button>
+                <button onclick="showReviewModal()" class="py-2 bg-yellow-100 rounded-lg text-yellow-700 hover:bg-yellow-200 font-medium text-sm">
+                    ✍️ Review Words
+                </button>
+            </div>
+            
+        </div>
+
+        <!-- History Modal (Hidden by default) -->
+        <div id="history-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-xl max-w-lg mx-auto p-6 mt-10 card">
+                <h2 class="text-2xl font-bold text-indigo-700 mb-4 border-b pb-2">Your Vocabulary Log</h2>
+                <div id="history-list" class="space-y-3 max-h-96 overflow-y-auto">
+                    <p class="text-gray-500">Loading history...</p>
+                </div>
+                <button onclick="document.getElementById('history-modal').classList.add('hidden')"
+                        class="mt-6 w-full py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 font-bold">
+                    Close
+                </button>
+            </div>
+        </div>
+
+        <!-- Review and Selection Modal -->
+        <div id="review-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-xl max-w-lg mx-auto p-6 mt-10 card">
+                <h2 class="text-2xl font-bold text-yellow-700 mb-4 border-b pb-2">Select Words to Review</h2>
+                <p class="text-sm text-gray-600 mb-4">Choose **3 to 5** words you want to practice in a custom quiz.</p>
+                <div id="word-selection-list" class="space-y-2 max-h-80 overflow-y-auto">
+                    <!-- Checkbox list will be generated here -->
+                    <p class="text-gray-500 text-center">Loading words...</p>
+                </div>
+                <p id="selection-error" class="text-sm text-red-500 text-center mt-3 h-5"></p>
+                <button id="start-custom-quiz-button" onclick="startCustomQuizFromSelection()"
+                        class="mt-6 w-full py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-bold disabled:opacity-50"
+                        disabled>
+                    Start Custom Quiz
+                </button>
+                <button onclick="document.getElementById('review-modal').classList.add('hidden')"
+                        class="mt-3 w-full py-3 bg-gray-300 text-gray-800 rounded-xl hover:bg-gray-400 font-bold">
+                    Cancel
+                </button>
+            </div>
+        </div>
+
+
+        <!-- Quiz Modal (Used for both Random and Custom Quizzes) -->
+        <div id="quiz-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 p-4 overflow-y-auto">
+            <div class="bg-white rounded-xl max-w-lg mx-auto p-6 mt-10 card">
+                <h2 class="text-2xl font-bold text-yellow-700 mb-4 border-b pb-2">Vocabulary VocaBot Quiz</h2>
+                <div id="quiz-content" class="space-y-4 max-h-96 overflow-y-auto">
+                    <p class="text-gray-500 text-center" id="quiz-status">Loading quiz questions from the Brain-Helper...</p>
+                </div>
+                <div id="quiz-results" class="hidden mt-4 p-4 rounded-xl bg-green-50 text-center"></div>
+                <button onclick="document.getElementById('quiz-modal').classList.add('hidden')"
+                        class="mt-6 w-full py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 font-bold">
+                    Close Quiz
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        // NOTE: ADDED 'addDoc' and 'where' to imports for the multi-word functionality.
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, query, setDoc, addDoc, getDoc, updateDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set Firebase Log Level to debug for development
+        setLogLevel('Debug');
+        
+        // --- Global Firebase and App Variables ---
+        // GEMINI_API_KEY is left empty; the environment automatically provides it for the API calls.
+		
+		window.GEMINI_API_KEY = "AIzaSyCxtGofEZOJYxN0HHAyjqof23AuIDrmeBg";         
+        //const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+		
+		
+		// Your web app's Firebase configuration
+const yourActualConfig = {
+  apiKey: "AIzaSyAnUlVvwLVB3akWHDOkhfuZ16iyFnICjws",
+  authDomain: "rock-1be6e.firebaseapp.com",
+  projectId: "rock-1be6e",
+  storageBucket: "rock-1be6e.firebasestorage.app",
+  messagingSenderId: "994101280188",
+  appId: "1:994101280188:web:b9625443f355bb186bffb9",
+  measurementId: "G-X58TGWLXMS"
+};
+
+		//const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+		
+		const appId = 'rock-1be6e';
+		
+		const firebaseConfig = yourActualConfig;
+		
+        //const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+		
+		const initialAuthToken = null;
+        
+        let db, auth;
+        window.currentUsername = null; 
+        const WORD_COLLECTION_PATH = 'vocabulary_entries';
+        const STREAK_DOC_PATH = 'streak_data'; 
+        const SHARED_PASSWORD = 'acronix';
+        const VALID_USERS = ['tanjiro', 'kakashi', 'goku', 'saitama', 'naruto', 'saskuke', 'ohsumi'];
+        window.allUserWords = []; 
+        const MAX_WORDS_PER_DAY = 5; 
+
+        // --- Utility Functions for Dates (FIXED: Attached to window for global scope) ---
+        window.getTodayDateString = function() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        window.getYesterdayDateString = function() {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            return d.toISOString().split('T')[0];
+        }
+        
+        // --- Core Firebase Initialization and Authentication ---
+        
+        async function initFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                window.db = db; 
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                console.log("Firebase Base Auth Ready (Anonymous/Token Session established).");
+
+            } catch (error) {
+                console.error("Error initializing Firebase or signing in:", error);
+                document.getElementById('login-status').textContent = "⚠️ Firebase Init Error";
+            }
+        }
+
+        window.handleLogout = async () => {
+            window.currentUsername = null;
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('username-input').value = '';
+            document.getElementById('password-input').value = '';
+            document.getElementById('login-status').textContent = 'Logged out successfully.';
+            document.getElementById('streak-counter').textContent = '0'; // Reset display on logout
+        };
+
+        window.handleLogin = async () => {
+            const usernameInput = document.getElementById('username-input').value.toLowerCase().trim();
+            const passwordInput = document.getElementById('password-input').value;
+            const status = document.getElementById('login-status');
+            
+            if (passwordInput !== SHARED_PASSWORD) {
+                status.textContent = "Incorrect password. Try again!";
+                return;
+            }
+
+            if (!VALID_USERS.includes(usernameInput)) {
+                status.textContent = "Invalid username. Check the list below!";
+                return;
+            }
+
+            window.currentUsername = usernameInput;
+            
+            document.getElementById('user-id-display').textContent = `User: ${usernameInput}`;
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            status.textContent = "";
+
+            // Initialize streak display upon login
+            await window.loadStreak();
+            // Try to fetch today's word immediately, which includes count check
+            await window.fetchWordAndGenerateExample(true); // Pass true to only check count and update button
+        };
+        
+        // --- Firestore Saving Function ---
+        window.saveWord = async (wordEntry) => {
+            if (!window.currentUsername) {
+                console.error("Cannot save: No username logged in.");
+                return;
+            }
+            const statusElement = document.getElementById('save-status');
+            statusElement.className = "text-center text-sm font-medium text-blue-600";
+            statusElement.textContent = "Saving to your Vocabulary VocaBot log...";
+
+            try {
+                // Use addDoc to allow multiple entries per day (auto-generates unique ID)
+                const path = `/artifacts/${appId}/users/${window.currentUsername}/${WORD_COLLECTION_PATH}`;
+                await addDoc(collection(db, path), wordEntry);
+                
+                statusElement.className = "text-center text-sm font-medium text-green-600";
+                statusElement.textContent = "🎉 Word saved successfully!";
+                return true;
+            } catch (error) {
+                console.error("Error saving word to Firestore:", error);
+                statusElement.className = "text-center text-sm font-medium text-red-600";
+                statusElement.textContent = "❌ Save failed. Check console for details.";
+                return false;
+            }
+        };
+        
+        // --- NEW: Function to get all learned words for exclusion list ---
+        window.getAllLearnedWords = async () => {
+            if (!window.currentUsername) return [];
+            const path = `/artifacts/${appId}/users/${window.currentUsername}/${WORD_COLLECTION_PATH}`;
+            try {
+                // Fetch all documents in the word collection
+                const q = query(collection(db, path));
+                const querySnapshot = await getDocs(q);
+                // Extract just the 'word' field from all documents
+                return querySnapshot.docs.map(doc => doc.data().word);
+            } catch (error) {
+                console.error("Error fetching all learned words:", error);
+                return [];
+            }
+        };
+
+
+        // --- Streak Logic ---
+
+        window.loadStreak = async () => {
+             if (!window.currentUsername) return;
+             // IMPORTANT: Path uses username
+             const streakDocRef = doc(db, `/artifacts/${appId}/users/${window.currentUsername}/${STREAK_DOC_PATH}/main_streak`);
+             
+             try {
+                const docSnap = await getDoc(streakDocRef);
+                const streakData = docSnap.exists() ? docSnap.data() : { count: 0, lastLoginDate: null };
+                document.getElementById('streak-counter').textContent = streakData.count.toString();
+                return streakData;
+             } catch (error) {
+                 console.error("Error loading streak:", error);
+                 return { count: 0, lastLoginDate: null };
+             }
+        }
+
+        window.updateStreak = async (wordDate) => {
+            if (!window.currentUsername) return;
+            // IMPORTANT: Path uses username
+            const streakDocRef = doc(db, `/artifacts/${appId}/users/${window.currentUsername}/${STREAK_DOC_PATH}/main_streak`);
+            const streakCounterEl = document.getElementById('streak-counter');
+            
+            try {
+                const docSnap = await getDoc(streakDocRef);
+                let currentStreakData = docSnap.exists() ? docSnap.data() : { count: 0, lastLoginDate: null };
+                const oldStreakCount = currentStreakData.count; // Capture old count
+                
+                const today = wordDate; 
+                const yesterday = window.getYesterdayDateString(); 
+                const lastLogin = currentStreakData.lastLoginDate;
+                let newStreakCount = currentStreakData.count;
+
+                if (lastLogin === today) {
+                    // Already updated today, do nothing to the count (This is fine as streak is based on day, not number of words)
+                    return; 
+                } else if (lastLogin === yesterday) {
+                    // Logged in yesterday, increment streak
+                    newStreakCount = newStreakCount + 1;
+                } else {
+                    // Break in streak, or first time, reset to 1
+                    newStreakCount = 1;
+                }
+                
+                // Update Firestore
+                await setDoc(streakDocRef, { 
+                    count: newStreakCount, 
+                    lastLoginDate: today 
+                });
+
+                // Update UI
+                streakCounterEl.textContent = newStreakCount.toString();
+
+                // 7. Animation Logic
+                if (newStreakCount > oldStreakCount) {
+                    streakCounterEl.classList.add('streak-celebration');
+                    setTimeout(() => {
+                        streakCounterEl.classList.remove('streak-celebration');
+                    }, 500); // Duration of the animation
+                }
+
+
+            } catch (error) {
+                console.error("Error updating streak:", error);
+            }
+        }
+        
+        // --- History & Review Functions ---
+        
+        window.countWordsFetchedToday = async () => {
+            if (!window.currentUsername) return 0;
+            const today = window.getTodayDateString(); 
+            const path = `/artifacts/${appId}/users/${window.currentUsername}/${WORD_COLLECTION_PATH}`;
+
+            try {
+                // Query the collection for documents where the 'date' field matches today
+                const q = query(
+                    collection(db, path),
+                    where("date", "==", today)
+                );
+                const querySnapshot = await getDocs(q);
+                // Return the total count of words saved today
+                return querySnapshot.docs.length; 
+            } catch (error) {
+                console.error("Error counting words fetched today:", error);
+                // On error, assume 0 to allow user to try again
+                return 0; 
+            }
+        }
+
+
+        window.showHistory = async () => {
+             if (!window.currentUsername) {
+                console.warn("Please log in first.");
+                return;
+            }
+            const path = `/artifacts/${appId}/users/${window.currentUsername}/${WORD_COLLECTION_PATH}`;
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '<p class="text-center text-indigo-500">Fetching your log...</p>';
+            
+            try {
+                const q = query(collection(db, path));
+                const querySnapshot = await getDocs(q);
+                
+                // FIX: Clear and populate allUserWords correctly
+                window.allUserWords = querySnapshot.docs.map(doc => doc.data());
+                
+                if (window.allUserWords.length === 0) {
+                    historyList.innerHTML = '<p class="text-center text-gray-500">You haven\'t learned any words yet! Start with today\'s word.</p>';
+                } else {
+                    historyList.innerHTML = '';
+                    // Sort by date (newest first)
+                    window.allUserWords.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(entry => {
+                        const div = document.createElement('div');
+                        div.className = 'p-3 bg-indigo-50 rounded-lg border border-indigo-200';
+                        div.innerHTML = `
+                            <p class="font-bold text-lg text-indigo-700">${entry.word} <span class="text-sm text-gray-500">(${entry.partOfSpeech})</span></p>
+                            <p class="text-sm text-gray-700">${entry.definition}</p>
+                            <p class="text-xs text-green-600 mt-1">Learned: ${entry.date}</p>
+                        `;
+                        historyList.appendChild(div);
+                    });
+                }
+                document.getElementById('history-modal').classList.remove('hidden');
+            } catch (error) {
+                console.error("Error loading history:", error);
+                historyList.innerHTML = '<p class="text-center text-red-500">Error loading history.</p>';
+            }
+        }
+
+        window.showReviewModal = async () => {
+            if (!window.currentUsername) {
+                console.warn("Please log in first.");
+                return;
+            }
+            
+            const selectionList = document.getElementById('word-selection-list');
+            selectionList.innerHTML = '<p class="text-center text-yellow-500">Loading your word list...</p>';
+            document.getElementById('review-modal').classList.remove('hidden');
+
+            // Load history data first (This now correctly populates window.allUserWords)
+            await window.showHistory();
+            const words = window.allUserWords; 
+
+            if (words.length === 0) {
+                 selectionList.innerHTML = '<p class="text-center text-gray-500">No words saved yet! Try the "Get New Word" button.</p>';
+                 document.getElementById('start-custom-quiz-button').disabled = true;
+                 return;
+            }
+            
+            selectionList.innerHTML = '';
+            // Use a Set to store unique words by their name, avoiding duplicates if multiple words were saved quickly
+            const uniqueWords = [];
+            const wordSet = new Set();
+            
+            // Filter words to ensure uniqueness before display
+            words.forEach(entry => {
+                // Use a combination of word and date for better uniqueness if needed, but word is usually enough
+                if (!wordSet.has(entry.word)) { 
+                    wordSet.add(entry.word);
+                    uniqueWords.push(entry);
+                }
+            });
+
+
+            uniqueWords.forEach((entry) => {
+                const container = document.createElement('label');
+                container.className = 'flex items-center p-3 bg-yellow-50 rounded-lg border border-yellow-200 hover:bg-yellow-100 cursor-pointer';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'review-word';
+                checkbox.dataset.word = JSON.stringify(entry);
+                checkbox.onchange = checkSelectionCount;
+                checkbox.className = 'w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500';
+                
+                const span = document.createElement('span');
+                span.className = 'ml-3 text-lg font-bold text-gray-700';
+                span.textContent = entry.word;
+
+                container.appendChild(checkbox);
+                container.appendChild(span);
+                selectionList.appendChild(container);
+            });
+            checkSelectionCount(); 
+        };
+        
+        function checkSelectionCount() {
+            const checkboxes = Array.from(document.querySelectorAll('#word-selection-list input[type="checkbox"]:checked'));
+            const count = checkboxes.length;
+            const errorEl = document.getElementById('selection-error');
+            const button = document.getElementById('start-custom-quiz-button');
+            
+            // --- UPDATED LOGIC: Minimum 4 words, maximum 10 words ---
+            const MIN_COUNT = 4;
+            const MAX_COUNT = 10; 
+
+            if (count >= MIN_COUNT && count <= MAX_COUNT) {
+                errorEl.textContent = `(${count} words selected) - Perfect!`;
+                errorEl.classList.remove('text-red-500');
+                errorEl.classList.add('text-green-600');
+                button.disabled = false;
+            } else if (count > MAX_COUNT) {
+                 errorEl.textContent = `Too many words! Please select a maximum of ${MAX_COUNT}. (Selected: ${count})`;
+                errorEl.classList.add('text-red-500');
+                errorEl.classList.remove('text-green-600');
+                button.disabled = true;
+            } else {
+                errorEl.textContent = `Please select ${MIN_COUNT} or more words. (Selected: ${count})`;
+                errorEl.classList.add('text-red-500');
+                errorEl.classList.remove('text-green-600');
+                button.disabled = true;
+            }
+        }
+        
+        window.startCustomQuizFromSelection = () => {
+            const checkboxes = Array.from(document.querySelectorAll('#word-selection-list input[type="checkbox"]:checked'));
+            const selectedWords = checkboxes.map(cb => JSON.parse(cb.dataset.word));
+            
+            // --- UPDATED LOGIC: Use the same MIN/MAX as checkSelectionCount ---
+            const MIN_COUNT = 4;
+            const MAX_COUNT = 10; 
+
+            if (selectedWords.length >= MIN_COUNT && selectedWords.length <= MAX_COUNT) {
+                document.getElementById('review-modal').classList.add('hidden');
+                prepareAndStartQuiz(selectedWords); 
+            } else {
+                 console.error("Invalid selection count when trying to start quiz.");
+            }
+        };
+
+        // Initialize Firebase on load
+        initFirebase();
+    </script>
+
+
+    <!-- Application Logic (Must be outside the module script to access window objects) -->
+    <script>
+        
+        const loader = document.getElementById('button-loader');
+        const buttonText = document.getElementById('button-text');
+        const fetchButton = document.getElementById('fetch-button');
+        const wordEl = document.getElementById('current-word');
+        const definitionEl = document.getElementById('current-definition');
+        const posEl = document.getElementById('part-of-speech');
+        const geminiExampleEl = document.getElementById('gemini-example');
+        const statusEl = document.getElementById('save-status');
+
+        window.currentQuiz = [];
+        window.userAnswers = {};
+        const MAX_WORDS_PER_DAY = 5; // Global constant for JS scope
+
+        function setButtonState(isLoading, currentCount) {
+            fetchButton.disabled = isLoading || currentCount >= MAX_WORDS_PER_DAY;
+            
+            // Update button text to show the current status
+            if (currentCount >= MAX_WORDS_PER_DAY && !isLoading) {
+                 buttonText.textContent = `Limit Reached (${MAX_WORDS_PER_DAY}/${MAX_WORDS_PER_DAY})`;
+                 loader.classList.add('hidden');
+                 return;
+            }
+
+            if (isLoading) {
+                buttonText.textContent = "Working...";
+                loader.classList.remove('hidden');
+            } else {
+                buttonText.textContent = `Get New Word (${currentCount}/${MAX_WORDS_PER_DAY})`;
+                loader.classList.add('hidden');
+            }
+        }
+        
+        /**
+         * Step 1a: Agentic Step - Calls Gemini for a structured random word.
+         * @param {string[]} learnedWords - List of words to exclude from generation.
+         */
+        async function callGeminiForRandomWord(learnedWords) {
+            // The system prompt is defined below to be passed to the API call.
+            const systemPrompt = "You are a vocabulary curator for 8-year-old children. Generate one single, slightly challenging but age-appropriate English word, its part of speech (noun, verb, adjective, adverb), and a concise, simple definition. Ensure the word is unique and not extremely common. Return ONLY a single JSON object.";
+            
+            // NEW: Add exclusion list to the user query
+            const exclusionList = learnedWords.length > 0 ? `DO NOT repeat any of these words: ${learnedWords.join(', ')}.` : '';
+            const userQuery = `Generate a new vocabulary word for a child. ${exclusionList}`;
+            
+            const apiKey = window.GEMINI_API_KEY;
+            const modelName = 'gemini-2.5-flash-preview-09-2025'; 
+            // If apiKey is empty, no ?key= will be added, allowing Canvas to inject the key
+            const urlKey = apiKey ? `?key=${apiKey}` : ''; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent${urlKey}`;
+            const MAX_RETRIES = 5;
+
+            const responseSchema = {
+                type: "OBJECT",
+                properties: {
+                    word: { type: "STRING" },
+                    definition: { type: "STRING" },
+                    partOfSpeech: { type: "STRING" }
+                },
+                required: ["word", "definition", "partOfSpeech"]
+            };
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                }
+            };
+            
+            for (let i = 0; i < MAX_RETRIES; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 429 && i < MAX_RETRIES - 1) {
+                            const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const jsonString = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (jsonString) {
+                        const wordData = JSON.parse(jsonString);
+                        // getTodayDateString is now globally accessible
+                        wordData.date = window.getTodayDateString(); 
+                        return wordData;
+                    }
+                    throw new Error("Gemini word response was empty or malformed.");
+
+                } catch (error) {
+                    console.error("Gemini Random Word API call failed:", error);
+                    // Fallback to a mock word on error
+                    return {
+                        word: "Felicity",
+                        definition: "Intense happiness.",
+                        partOfSpeech: "noun",
+                        date: window.getTodayDateString()
+                    };
+                }
+            }
+            return {
+                word: "Mystery",
+                definition: "Something that is difficult or impossible to understand or explain.",
+                partOfSpeech: "noun",
+                date: window.getTodayDateString()
+            };
+        }
+        
+        /**
+         * Step 1b: Agentic Step - Calls Gemini to generate a custom example sentence (Creative Task).
+         */
+        async function callGeminiAPI(word, definition) {
+            // The system prompt is defined below to be passed to the API call.
+            const systemPrompt = "You are a fun, friendly, and imaginative language tutor for an 8-year-old child. Your job is to create a single, unique, and highly creative example sentence for the given word and definition. The sentence must be short (under 15 words), very humorous, and relatable to a child's everyday life. Do NOT include any introductory or concluding text, just the sentence.";
+            const userQuery = `The word is '${word}'. Its definition is: '${definition}'.`;
+            const apiKey = window.GEMINI_API_KEY;
+            const modelName = 'gemini-2.5-flash-preview-09-2025'; 
+            // If apiKey is empty, no ?key= will be added, allowing Canvas to inject the key
+            const urlKey = apiKey ? `?key=${apiKey}` : '';
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent${urlKey}`;
+            const MAX_RETRIES = 5;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+            
+            for (let i = 0; i < MAX_RETRIES; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 429 && i < MAX_RETRIES - 1) {
+                            const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) {
+                        return text.trim().replace(/['"]/g, ''); 
+                    }
+                    throw new Error("Gemini response was empty or malformed.");
+
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    return `Error: Could not generate a fun example for "${word}".`;
+                }
+            }
+            return "Failed to generate custom example after multiple retries.";
+        }
+
+
+        /**
+         * Step 1c: Agentic Step - Calls Gemini for a structured JSON quiz (Data Generation Task).
+         */
+        async function callGeminiForQuiz(words) {
+            const wordList = words.map(w => `${w.word}: ${w.definition}`).join('\n');
+            
+            // --- UPDATED SYSTEM PROMPT: Requesting FOUR options (A, B, C, D) ---
+            const systemPrompt = "You are a quiz master for an 8-year-old. Create a multiple-choice question for each word provided. Each question must use the word in a sentence and have four options, with one being the correct definition. Return ONLY a single JSON array.";
+
+            const userQuery = `Please create a multiple-choice quiz based on these words:\n${wordList}`;
+            const apiKey = window.GEMINI_API_KEY;
+            const modelName = 'gemini-2.5-flash-preview-09-2025'; 
+            // If apiKey is empty, no ?key= will be added, allowing Canvas to inject the key
+            const urlKey = apiKey ? `?key=${apiKey}` : '';
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent${urlKey}`;
+            const MAX_RETRIES = 5;
+
+            const responseSchema = {
+                type: "ARRAY",
+                items: {
+                    type: "OBJECT",
+                    properties: {
+                        questionText: { type: "STRING", description: "The quiz question using the vocabulary word in a simple sentence." },
+                        word: { type: "STRING", description: "The vocabulary word being tested." },
+                        options: { 
+                            type: "ARRAY", 
+                            // --- UPDATED DESCRIPTION: Reflects 4 options ---
+                            description: "An array of 4 options, one correct definition and three incorrect, age-appropriate definitions.",
+                            items: { type: "STRING" }
+                        },
+                        // --- UPDATED DESCRIPTION: Correct index is 0, 1, 2, or 3 ---
+                        correctAnswerIndex: { type: "NUMBER", description: "The index (0, 1, 2, or 3) of the correct definition in the options array." }
+                    },
+                    required: ["questionText", "word", "options", "correctAnswerIndex"]
+                }
+            };
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                }
+            };
+
+            for (let i = 0; i < MAX_RETRIES; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                         if (response.status === 429 && i < MAX_RETRIES - 1) {
+                            const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const jsonString = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (jsonString) {
+                        return JSON.parse(jsonString);
+                    }
+                    throw new Error("Gemini structured response was empty or malformed.");
+
+                } catch (error) {
+                    console.error("Gemini Quiz API call failed:", error);
+                    return []; 
+                }
+            }
+            return []; 
+        }
+
+        /**
+         * Main Orchestration Function (Word of the Day)
+         * @param {boolean} checkOnly - If true, only checks the count and updates the button, does not fetch a new word.
+         */
+        window.fetchWordAndGenerateExample = async (checkOnly = false) => {
+            if (!window.currentUsername) {
+                console.error("Cannot proceed: User not logged in.");
+                return;
+            }
+            
+            // 1. Check how many words were saved for today
+            const wordsFetchedToday = await window.countWordsFetchedToday(); 
+            
+            // Update button text and check limit immediately
+            setButtonState(false, wordsFetchedToday);
+
+            if (wordsFetchedToday >= MAX_WORDS_PER_DAY) {
+                statusEl.className = "text-center text-sm font-medium text-red-600";
+                statusEl.textContent = `🚫 Limit Reached! You have mastered ${MAX_WORDS_PER_DAY} words today! Try again tomorrow.`;
+                return;
+            }
+
+            // Exit early if this call was just for initialization/count check
+            if (checkOnly) {
+                return;
+            }
+            
+            // If we are here, we are fetching a new word and the limit is not reached.
+            setButtonState(true, wordsFetchedToday); // Set loading state
+            
+            // NEW: Fetch all previously learned words to prevent repetition
+            const learnedWords = await window.getAllLearnedWords(); 
+
+            try {
+                // 2. Fetch truly random word data from Gemini, passing the exclusion list
+                const wordData = await callGeminiForRandomWord(learnedWords);
+                
+                // 3. Agentic Step: Call Gemini API for creative example (now short and humorous)
+                const geminiExample = await callGeminiAPI(wordData.word, wordData.definition);
+                
+                // 4. Construct and save the final data
+                const finalEntry = {
+                    date: wordData.date,
+                    word: wordData.word,
+                    partOfSpeech: wordData.partOfSpeech,
+                    definition: wordData.definition,
+                    gemini_example_sentence: geminiExample
+                };
+                
+                // 5. Display the word data
+                displayWordData(finalEntry);
+
+                // 6. Save the word and update the streak ONLY if save is successful
+                const saveSuccess = await window.saveWord(finalEntry);
+                if (saveSuccess) {
+                    // Update streak (only once per day, regardless of how many words were fetched)
+                    await window.updateStreak(finalEntry.date);
+                    
+                    // Update button text to reflect the NEW count
+                    const newCount = wordsFetchedToday + 1;
+                    setButtonState(false, newCount); // Set not-loading state with new count
+                }
+
+            } catch (error) {
+                console.error("Full workflow failed:", error);
+                statusEl.className = "text-center text-sm font-medium text-red-600";
+                statusEl.textContent = "An error occurred fetching the word or running the brain-helper.";
+            } finally {
+                // Ensure the button state reflects the actual count after failure
+                if (!statusEl.textContent.includes("Save failed")) {
+                   const finalCount = await window.countWordsFetchedToday();
+                   setButtonState(false, finalCount);
+                } else {
+                   // If save failed, count is the same as before attempt
+                   setButtonState(false, wordsFetchedToday);
+                }
+            }
+        }
+
+        function displayWordData(data) {
+            wordEl.textContent = data.word;
+            definitionEl.textContent = data.definition;
+            posEl.textContent = `Part of Speech: ${data.partOfSpeech}`;
+            geminiExampleEl.textContent = data.gemini_example_sentence;
+        }
+
+
+        // --- Quiz Game Logic (Shared for Random and Custom Quizzes) ---
+        
+        window.prepareAndStartQuiz = async (wordsToQuiz) => {
+            const quizModal = document.getElementById('quiz-modal');
+            const quizContent = document.getElementById('quiz-content');
+            const quizStatus = document.getElementById('quiz-status');
+            const quizResults = document.getElementById('quiz-results');
+
+            quizModal.classList.remove('hidden');
+            quizResults.classList.add('hidden'); 
+            quizContent.innerHTML = '';
+            quizStatus.textContent = "Loading words from your history...";
+
+            if (wordsToQuiz.length < 4) { // Guard for the new 4-word minimum
+                quizStatus.textContent = "You need at least 4 words saved to start a quiz! Go learn some new words first. 🤓";
+                return;
+            }
+
+            quizStatus.textContent = `Asking the Brain-Helper to create a quiz with ${wordsToQuiz.length} words...`;
+
+            // Agentic call to Gemini to generate the quiz structure
+            const quizData = await callGeminiForQuiz(wordsToQuiz);
+
+            if (quizData.length === 0) {
+                quizStatus.textContent = "The Brain-Helper couldn't generate the quiz. Try again!";
+                return;
+            }
+
+            window.currentQuiz = quizData;
+            window.userAnswers = {};
+            renderQuiz();
+            quizStatus.textContent = "";
+        };
+
+        function renderQuiz() {
+            const quizContent = document.getElementById('quiz-content');
+            quizContent.innerHTML = '';
+            document.getElementById('quiz-results').classList.add('hidden'); 
+
+            window.currentQuiz.forEach((q, qIndex) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'p-4 bg-white rounded-xl border border-yellow-300 shadow-md space-y-2';
+                questionDiv.innerHTML = `
+                    <p class="font-bold text-lg text-yellow-700">Question ${qIndex + 1}:</p>
+                    <p class="text-gray-800">${q.questionText}</p>
+                `;
+
+                q.options.forEach((option, oIndex) => {
+                    const button = document.createElement('button');
+                    // String.fromCharCode(65 + oIndex) handles A, B, C, D (for 4 options)
+                    button.className = 'w-full text-left py-2 px-3 rounded-lg border text-gray-700 bg-yellow-100 hover:bg-yellow-200 transition duration-100 mt-1';
+                    button.textContent = `${String.fromCharCode(65 + oIndex)}. ${option}`;
+                    button.onclick = () => selectAnswer(qIndex, oIndex);
+                    button.id = `q${qIndex}-o${oIndex}`;
+                    questionDiv.appendChild(button);
+                });
+
+                quizContent.appendChild(questionDiv);
+            });
+
+            const submitButton = document.createElement('button');
+            submitButton.textContent = "Check My Answers! ✅";
+            submitButton.className = 'w-full py-3 mt-6 text-xl font-extrabold bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition duration-150';
+            submitButton.onclick = handleSubmitQuiz;
+            submitButton.id = 'submit-quiz-button';
+            quizContent.appendChild(submitButton);
+
+            applyAnswerStyles(false); 
+        }
+
+        function selectAnswer(qIndex, oIndex) {
+            window.userAnswers[qIndex] = oIndex;
+            applyAnswerStyles(false);
+        }
+
+        function applyAnswerStyles(showResults) {
+            window.currentQuiz.forEach((q, qIndex) => {
+                q.options.forEach((_, oIndex) => {
+                    const button = document.getElementById(`q${qIndex}-o${oIndex}`);
+                    if (!button) return;
+
+                    button.classList.remove('bg-yellow-300', 'bg-green-100', 'bg-red-100', 'border-yellow-500', 'border-green-500', 'border-red-500');
+                    
+                    if (showResults) {
+                        if (oIndex === q.correctAnswerIndex) {
+                            button.classList.add('bg-green-100', 'border-green-500');
+                        } else if (window.userAnswers[qIndex] === oIndex) {
+                            button.classList.add('bg-red-100', 'border-red-500');
+                        } else {
+                            button.classList.add('bg-yellow-100');
+                        }
+                    } else {
+                        if (window.userAnswers[qIndex] === oIndex) {
+                            button.classList.add('bg-yellow-300', 'border-yellow-500');
+                        } else {
+                            button.classList.add('bg-yellow-100');
+                        }
+                    }
+                });
+            });
+        }
+
+        function handleSubmitQuiz() {
+            const quizResults = document.getElementById('quiz-results');
+            const submitButton = document.getElementById('submit-quiz-button');
+            
+            let correctCount = 0;
+            window.currentQuiz.forEach((q, qIndex) => {
+                if (window.userAnswers[qIndex] === q.correctAnswerIndex) {
+                    correctCount++;
+                }
+            });
+
+            const totalQuestions = window.currentQuiz.length;
+            const scoreText = `You got ${correctCount} out of ${totalQuestions} correct!`;
+            const percentage = (correctCount / totalQuestions) * 100;
+            
+            let message = '';
+            if (percentage === 100) {
+                message = "🌟 AMAZING! You are a Vocabulary VocaBot Star!";
+            } else if (percentage >= 60) {
+                message = "👍 Good job! Keep practicing, you're learning fast!";
+            } else {
+                message = "💪 Great start! Review your words and try again tomorrow!";
+            }
+
+            quizResults.innerHTML = `<p class="text-2xl font-black text-green-700">${message}</p><p class="text-xl font-bold mt-2">${scoreText}</p>`;
+            quizResults.classList.remove('hidden');
+            
+            submitButton.textContent = "Quiz Complete!";
+            submitButton.disabled = true;
+
+            applyAnswerStyles(true);
+        }
+    </script>
+</body>
+</html>
